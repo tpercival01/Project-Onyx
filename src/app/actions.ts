@@ -12,12 +12,26 @@ export async function submitGamertag(formData: FormData) {
     throw new Error('Invalid gamertag');
   }
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  'https://api.onyx.thomaspercival.dev';
 
-  // 1. Tell Python to fetch the XUID and start the background sync
-  const res = await fetch(`${API_URL}/sync/profile/${gamertag}`, {
+const token = process.env.ONYX_SYNC_TOKEN;
+
+if (!token) {
+  throw new Error('Backend authentication is not configured');
+}
+
+const res = await fetch(
+  `${API_URL}/sync/profile/${encodeURIComponent(gamertag.trim())}`,
+  {
     method: 'POST',
-  });
+    headers: {
+      'X-Onyx-Sync-Token': token,
+    },
+    cache: 'no-store',
+  }
+);
 
   if (!res.ok) {
     throw new Error('Failed to reach sync engine');
