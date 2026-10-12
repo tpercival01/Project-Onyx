@@ -8,7 +8,7 @@ export const users = pgTable("users", {
 });
 
 export const games = pgTable("games", {
-  id: text("id").primaryKey(),
+  id: text("id").notNull(),
   userXuid: text("user_xuid")
     .notNull()
     .references(() => users.xuid),
@@ -18,8 +18,10 @@ export const games = pgTable("games", {
   currentGamerscore: integer("current_gamerscore").default(0),
   totalGamerscore: integer("total_gamerscore").default(0),
   lastTimePlayed: timestamp("last_time_played"),
-  displayImage: text("display_image"),
-});
+    displayImage: text("display_image"),
+  }, (table) => [
+    primaryKey({ columns: [table.id, table.userXuid] }),
+]);
 
 export const achievements = pgTable("achievements", {
   id: text("id").primaryKey(), 

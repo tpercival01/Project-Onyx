@@ -25,7 +25,10 @@ export default async function GamePage({
     );
 
   const gameRecord = await db.query.games.findFirst({
-    where: eq(games.id, titleId),
+    where: and(
+      eq(games.id, titleId),
+      eq(games.userXuid, xuid)
+    ),
   });
   const gameName = gameRecord ? gameRecord.name : 'Unknown Game';
 

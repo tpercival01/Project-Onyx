@@ -1,37 +1,55 @@
+
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { requestLibraryRefresh } from '@/app/actions';
 
 export function GlobalSyncButton({ xuid }: { xuid: string }) {
-  const router = useRouter();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   const handleSync = async () => {
+    if (isSyncing) return;
+
     setIsSyncing(true);
+    setMessage(null);
+    setError(false);
+
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/sync/refresh/${xuid}`, {
-        method: 'POST',
-      });
-      // Give Celery 6 seconds to fetch the games and queue achievement updates
-      await new Promise((resolve) => setTimeout(resolve, 6000));
-      router.refresh();
+      await requestLibraryRefresh(xuid);
+
+      setMessage(
+        'Refresh queued. Updated games will appear as synchronization completes.'
+      );
+    } catch {
+      setError(true);
+      setMessage('Unable to start refresh. Please try again later.');
     } finally {
       setIsSyncing(false);
     }
   };
 
   return (
-    <button 
-      onClick={handleSync}
-      disabled={isSyncing}
-      className={`rounded-md border px-6 py-2 font-mono tracking-widest transition-all ${
-        isSyncing 
-          ? 'border-red-900 bg-red-950/30 text-red-500 cursor-not-allowed animate-pulse' 
-          : 'border-neutral-800 bg-[#0a0a0a] text-neutral-400 hover:border-red-900 hover:text-red-500 hover:shadow-[0_0_15px_rgba(139,0,0,0.4)]'
-      }`}
-    >
-      {isSyncing ? '[ SYNCHRONIZING NETWORK... ]' : '[ SYNC LIVE DATA ]'}
-    </button>
+    <div className="flex flex-col gap-2">
+      <button
+        onClick={handleSync}
+        disabled={isSyncing}
+        className="rounded-lg border border-red-900/50 bg-neutral-900 px-6 py-3 font-medium text-red-400 transition-colors hover:bg-red-950 disabled:cursor-wait disabled:opacity-50"
+      >
+        {isSyncing ? 'Requesting refresh...' : 'Refresh Library'}
+      </button>
+
+      {message && (
+        <p
+          role={error ? 'alert' : 'status'}
+          className={`text-sm ${
+            error ? 'text-red-400' : 'text-neutral-400'
+          }`}
+        >
+          {message}
+        </p>
+      )}
+    </div>
   );
 }
