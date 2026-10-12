@@ -1,8 +1,13 @@
+
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { checkGamesExist, checkAchievementsExist } from '@/app/actions';
+import {
+  checkGamesExist,
+  checkAchievementsExist,
+  requestAchievementSync,
+} from '@/app/actions';
 
 export function SyncLoader({
   xuid,
@@ -10,45 +15,96 @@ export function SyncLoader({
   message,
 }: {
   xuid: string;
-  titleId?: string; // If provided, we poll achievements. If not, we poll games.
+  titleId?: string;
   message: string;
 }) {
   const router = useRouter();
+  const syncRequested = useRef(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If we need to sync achievements, tell the Python API to start cooking
-    if (titleId) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/sync/achievements/${xuid}/${titleId}`, {
-        method: 'POST',
-      }).catch(console.error);
+    let cancelled = false;
+    let timeout: ReturnType<typeof setTimeout>;
+    let attempts = 0;
+
+    async function start() {
+      try {
+        // Request achievement sync through Next.js, not the browser.
+        if (titleId && !syncRequested.current) {
+          syncRequested.current = true;
+          await requestAchievementSync(xuid, titleId);
+        }
+
+        async function poll() {
+          if (cancelled) return;
+
+          try {
+            const exists = titleId
+              ? await checkAchievementsExist(xuid, titleId)
+              : await checkGamesExist(xuid);
+
+            if (cancelled) return;
+
+            if (exists) {
+              router.refresh();
+              return;
+            }
+
+            attempts++;
+
+            if (attempts >= 20) {
+              setError(
+                'Sync is taking longer than expected. Please refresh the page.'
+              );
+              return;
+            }
+
+            timeout = setTimeout(poll, 3000);
+          } catch {
+            if (!cancelled) {
+              setError('Unable to check sync progress.');
+            }
+          }
+        }
+
+        await poll();
+      } catch {
+        if (!cancelled) {
+          setError('Unable to start achievement synchronization.');
+        }
+      }
     }
 
-    // Start polling the Neon Database every 3 seconds
-    const interval = setInterval(async () => {
-      let dataArrived = false;
-      
-      if (titleId) {
-        dataArrived = await checkAchievementsExist(xuid, titleId);
-      } else {
-        dataArrived = await checkGamesExist(xuid);
-      }
+    void start();
 
-      if (dataArrived) {
-        clearInterval(interval);
-        router.refresh(); // Tells Next.js to re-render the Server Component with the new data!
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [xuid, titleId, router]);
 
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center space-y-6">
-      {/* Mystic glowing red orb */}
-      <div className="h-16 w-16 animate-sith-pulse rounded-full bg-red-900 border border-red-500"></div>
-      <p className="text-xl tracking-widest text-neutral-400 font-mono uppercase">
-        {message}
-      </p>
+      {error ? (
+        <>
+          <p role="alert" className="text-center text-red-400">
+            {error}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-lg border border-neutral-700 px-5 py-2 text-white"
+          >
+            Try Again
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="h-16 w-16 animate-pulse rounded-full border border-red-500 bg-red-900" />
+          <p className="text-center font-mono text-xl text-neutral-400">
+            {message}
+          </p>
+        </>
+      )}
     </div>
   );
 }
