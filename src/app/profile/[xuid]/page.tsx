@@ -1,5 +1,5 @@
 import { db } from '@/lib/db';
-import { achievements, games } from '@/lib/schema';
+import { achievements, games, users } from '@/lib/schema';
 import { eq, desc, and} from 'drizzle-orm';
 import Link from 'next/link';
 import { SyncLoader } from '@/components/SyncLoader';
@@ -13,6 +13,14 @@ export default async function ProfilePage({
   params: Promise<{ xuid: string }>;
 }) {
   const xuid = (await params).xuid;
+  const [profile] = await db
+  .select({
+    gamertag: users.gamertag,
+    avatarUrl: users.avatarUrl,
+  })
+  .from(users)
+  .where(eq(users.xuid, xuid))
+  .limit(1);
 
   const userGames = await db
     .select()
@@ -46,14 +54,44 @@ return (
     <main className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8">
       
       {/* HEADER & SYNC BUTTON */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-widest text-neutral-200">
-            ONYX <span className="text-red-700">DASHBOARD</span>
-          </h1>
-        </div>
-        <GlobalSyncButton xuid={xuid} />
+      
+{/* PROFILE HEADER */}
+<div className="mb-10 flex flex-col gap-6 border-b border-white/10 pb-8 sm:flex-row sm:items-center sm:justify-between">
+  <div className="flex items-center gap-5">
+
+    {profile?.avatarUrl ? (
+      <img
+        src={profile.avatarUrl}
+        alt={`${profile.gamertag}'s Xbox avatar`}
+        className="h-20 w-20 shrink-0 rounded-2xl border border-white/10 bg-zinc-900 object-cover sm:h-24 sm:w-24"
+      />
+    ) : (
+      <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-zinc-900 text-3xl font-bold text-rose-400">
+        {profile?.gamertag?.charAt(0).toUpperCase() || '?'}
       </div>
+    )}
+
+    <div className="min-w-0">
+      <Link
+        href="/"
+        className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-400 transition hover:text-rose-300"
+      >
+        ONYX / PLAYER PROFILE
+      </Link>
+
+      <h1 className="mt-2 break-words text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+        {profile?.gamertag || 'Xbox Player'}
+      </h1>
+
+      <p className="mt-2 text-sm text-zinc-400">
+        {userGames.length.toLocaleString()} games in library
+      </p>
+    </div>
+  </div>
+
+  <GlobalSyncButton xuid={xuid} />
+</div>
+
 
       {/* THE ONYX SHOWCASE */}
       <div className="mb-16 grid grid-cols-2 md:grid-cols-4 gap-4 rounded-2xl border border-neutral-900 bg-[#050505] p-6 shadow-2xl shadow-red-900/5">
