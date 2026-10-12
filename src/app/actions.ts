@@ -12,26 +12,24 @@ export async function submitGamertag(formData: FormData) {
     throw new Error('Invalid gamertag');
   }
 
-  const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  'https://api.onyx.thomaspercival.dev';
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.onyx.thomaspercival.dev';
 
-const token = process.env.ONYX_SYNC_TOKEN;
+  const token = process.env.ONYX_SYNC_TOKEN;
 
-if (!token) {
-  throw new Error('Backend authentication is not configured');
-}
-
-const res = await fetch(
-  `${API_URL}/sync/profile/${encodeURIComponent(gamertag.trim())}`,
-  {
-    method: 'POST',
-    headers: {
-      'X-Onyx-Sync-Token': token,
-    },
-    cache: 'no-store',
+  if (!token) {
+    throw new Error('Backend authentication is not configured');
   }
-);
+
+  const res = await fetch(
+    `${API_URL}/sync/profile/${encodeURIComponent(gamertag.trim())}`,
+    {
+      method: 'POST',
+      headers: {
+        'X-Onyx-Sync-Token': token,
+      },
+      cache: 'no-store',
+    }
+  );
 
   if (!res.ok) {
     throw new Error('Failed to reach sync engine');
@@ -70,4 +68,49 @@ export async function checkAchievementsExist(xuid: string, titleId: string) {
     );
   
   return Number(result[0].count) > 0;
+}
+
+async function queueOnyxSync(path: string) {
+  const token = process.env.ONYX_SYNC_TOKEN;
+
+  if (!token) {
+    throw new Error('Backend authentication is not configured');
+  }
+
+  const response = await fetch(
+    `https://api.onyx.thomaspercival.dev${path}`,
+    {
+      method: 'POST',
+      headers: {
+        'X-Onyx-Sync-Token': token,
+      },
+      cache: 'no-store',
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Sync request failed (${response.status})`);
+  }
+}
+
+export async function requestAchievementSync(
+  xuid: string,
+  titleId: string
+) {
+  if (!/^\d{1,20}$/.test(xuid) ||
+      !/^\d{1,20}$/.test(titleId)) {
+    throw new Error('Invalid Xbox identifiers');
+  }
+
+  await queueOnyxSync(
+    `/sync/achievements/${xuid}/${titleId}`
+  );
+}
+
+export async function requestLibraryRefresh(xuid: string) {
+  if (!/^\d{1,20}$/.test(xuid)) {
+    throw new Error('Invalid Xbox identifier');
+  }
+
+  await queueOnyxSync(`/sync/refresh/${xuid}`);
 }
