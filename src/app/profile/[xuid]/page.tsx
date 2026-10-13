@@ -9,10 +9,13 @@ export const dynamic = 'force-dynamic';
 
 export default async function ProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ xuid: string }>;
+  searchParams: Promise<{ showAll?: string }>;
 }) {
   const xuid = (await params).xuid;
+  const showAll = (await searchParams).showAll === '1';
   const [profile] = await db
   .select({
     gamertag: users.gamertag,
@@ -35,7 +38,9 @@ export default async function ProfilePage({
       </main>
     );
   }
-
+  const visibleGames = showAll
+  ? userGames
+  : userGames.filter(game => game.earnedAchievements > 0);
   const unlockedAch = await db
   .select({gamerscore: achievements.gamerscore})
   .from(achievements)
@@ -125,9 +130,39 @@ return (
         </div>
       </div>
 
-      {/* GAME GRID */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-        {userGames.map((game) => (
+      {/* GAME LIBRARY */}
+<div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+  <div>
+    <h2 className="text-2xl font-semibold text-white">
+      Game Library
+    </h2>
+    <p className="mt-1 text-sm text-zinc-500">
+      Showing {visibleGames.length.toLocaleString()} of{' '}
+      {userGames.length.toLocaleString()} games
+    </p>
+  </div>
+
+  <Link
+    href={
+      showAll
+        ? `/profile/${xuid}`
+        : `/profile/${xuid}?showAll=1`
+    }
+    scroll={false}
+    className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-zinc-300 transition-colors hover:border-rose-500/40 hover:text-white"
+  >
+    {showAll ? 'Hide unstarted games' : 'Show all games'}
+  </Link>
+</div>
+
+{visibleGames.length === 0 && (
+  <p className="mb-8 rounded-xl border border-white/10 p-6 text-zinc-400">
+    No games with unlocked achievements found.
+  </p>
+)}
+
+<div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+  {visibleGames.map((game) => (
           <Link 
             href={`/profile/${xuid}/game/${game.id}`} 
             key={game.id} 
