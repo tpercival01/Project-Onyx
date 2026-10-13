@@ -63,10 +63,26 @@ export default async function ProfilePage({
   searchParams,
 }: {
   params: Promise<{ xuid: string }>;
-  searchParams: Promise<{ showAll?: string; medal?: string }>;
+  searchParams: Promise<{
+  showAll?: string;
+  medal?: string;
+  q?: string;
+  sort?: string;
+}>;
 }) {
   const { xuid } = await params;
   const query = await searchParams;
+  const search = (query.q ?? '').trim().toLowerCase();
+
+const sortOptions = [
+  'recent',
+  'name',
+  'completion',
+  'gamerscore',
+] as const;
+
+const sort =
+  sortOptions.find(option => option === query.sort) ?? 'recent';
 
   const showAll = query.showAll === '1';
   const selectedMedal =
@@ -156,22 +172,60 @@ const stats = [
   },
 ];
 
-  const visibleGames = userGames.filter((game) => {
-    if (selectedMedal) {
-      return getMedalTier(game) === selectedMedal;
+  const visibleGames = userGames
+  .filter(game => {
+    if (selectedMedal && getMedalTier(game) !== selectedMedal) {
+      return false;
     }
 
-    return showAll || game.earnedAchievements > 0;
+    if (!selectedMedal && !showAll && game.earnedAchievements === 0) {
+      return false;
+    }
+
+    return game.name.toLowerCase().includes(search);
+  })
+  .sort((a, b) => {
+    if (sort === 'name') {
+      return a.name.localeCompare(b.name);
+    }
+
+    if (sort === 'gamerscore') {
+      return (b.currentGamerscore ?? 0) - (a.currentGamerscore ?? 0);
+    }
+
+    if (sort === 'completion') {
+      const aProgress = a.totalAchievements > 0
+        ? a.earnedAchievements / a.totalAchievements
+        : -1;
+
+      const bProgress = b.totalAchievements > 0
+        ? b.earnedAchievements / b.totalAchievements
+        : -1;
+
+      return bProgress - aProgress || a.name.localeCompare(b.name);
+    }
+
+    return (
+      (b.lastTimePlayed?.getTime() ?? 0) -
+      (a.lastTimePlayed?.getTime() ?? 0)
+    );
   });
 
-  function profileUrl(medal: MedalTier | null = null) {
-    const params = new URLSearchParams();
-    if (showAll) params.set('showAll', '1');
-    if (medal) params.set('medal', medal);
+function profileUrl(
+  medal: MedalTier | null = null,
+  includeUnstarted = showAll
+) {
+  const params = new URLSearchParams();
 
-    const suffix = params.toString();
-    return `/profile/${xuid}${suffix ? `?${suffix}` : ''}`;
-  }
+  if (includeUnstarted) params.set('showAll', '1');
+  if (medal) params.set('medal', medal);
+  if (search) params.set('q', query.q?.trim() ?? '');
+  if (sort !== 'recent') params.set('sort', sort);
+
+  const suffix = params.toString();
+
+  return `/profile/${xuid}${suffix ? `?${suffix}` : ''}`;
+}
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-7xl px-6 py-10 text-zinc-100 lg:px-8">
@@ -340,7 +394,7 @@ const stats = [
             </Link>
           ) : (
             <Link
-              href={showAll ? `/profile/${xuid}` : `/profile/${xuid}?showAll=1`}
+              href={showAll ? profileUrl(null, false) : profileUrl(null, true)}
               scroll={false}
               className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-zinc-300 hover:border-white/25 hover:text-white"
             >
@@ -348,6 +402,47 @@ const stats = [
             </Link>
           )}
         </div>
+        <form
+  action={`/profile/${xuid}`}
+  method="get"
+  className="mb-8 flex flex-col gap-3 sm:flex-row"
+>
+  {showAll && (
+    <input type="hidden" name="showAll" value="1" />
+  )}
+
+  {selectedMedal && (
+    <input type="hidden" name="medal" value={selectedMedal} />
+  )}
+
+  <input
+    type="search"
+    name="q"
+    defaultValue={query.q ?? ''}
+    placeholder="Search games..."
+    aria-label="Search games by title"
+    className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#111318] px-4 py-3 text-sm text-white placeholder:text-zinc-500 focus:border-rose-500 focus:outline-none"
+  />
+
+  <select
+    name="sort"
+    defaultValue={sort}
+    aria-label="Sort games"
+    className="rounded-xl border border-white/10 bg-[#111318] px-4 py-3 text-sm text-white focus:border-rose-500 focus:outline-none"
+  >
+    <option value="recent">Recently played</option>
+    <option value="completion">Completion: highest first</option>
+    <option value="gamerscore">Gamerscore: highest first</option>
+    <option value="name">Name: A–Z</option>
+  </select>
+
+  <button
+    type="submit"
+    className="rounded-xl bg-rose-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-rose-500"
+  >
+    Apply
+  </button>
+</form>
 
         {visibleGames.length === 0 ? (
           <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-10 text-center">
