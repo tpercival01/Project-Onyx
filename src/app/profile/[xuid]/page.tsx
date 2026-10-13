@@ -107,6 +107,55 @@ export default async function ProfilePage({
     if (tier) medalCounts[tier]++;
   }
 
+  const startedGames = userGames.filter(
+  game => game.earnedAchievements > 0
+);
+
+const gamesWithTotals = startedGames.filter(
+  game => game.totalAchievements > 0
+);
+
+const earnedGamerscore = startedGames.reduce(
+  (sum, game) => sum + (game.currentGamerscore ?? 0), 0
+);
+
+const earnedAchievements = gamesWithTotals.reduce(
+  (sum, game) => sum + game.earnedAchievements, 0
+);
+
+const totalAchievements = gamesWithTotals.reduce(
+  (sum, game) => sum + game.totalAchievements, 0
+);
+
+const completionRate = totalAchievements > 0
+  ? (earnedAchievements / totalAchievements) * 100
+  : null;
+
+const stats = [
+  {
+    label: 'Gamerscore earned',
+    value: earnedGamerscore.toLocaleString() + ' G',
+    detail: 'Across started games',
+  },
+  {
+    label: 'Achievements unlocked',
+    value: `${earnedAchievements.toLocaleString()} / ${totalAchievements.toLocaleString()}`,
+    detail: 'Games with known totals',
+  },
+  {
+    label: 'Games completed',
+    value: `${medalCounts.onyx} / ${gamesWithTotals.length}`,
+    detail: 'Completed / known totals',
+  },
+  {
+    label: 'Achievement completion',
+    value: completionRate === null
+      ? '—'
+      : `${completionRate.toFixed(1)}%`,
+    detail: 'Across games with known totals',
+  },
+];
+
   const visibleGames = userGames.filter((game) => {
     if (selectedMedal) {
       return getMedalTier(game) === selectedMedal;
@@ -162,6 +211,38 @@ export default async function ProfilePage({
 
         <GlobalSyncButton xuid={xuid} />
       </header>
+
+      {/* PROFILE STATISTICS */}
+<section className="mb-12" aria-label="Profile statistics">
+  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    {stats.map((stat) => (
+      <div
+        key={stat.label}
+        className="rounded-2xl border border-white/10 bg-[#111318] p-5 sm:p-6"
+      >
+        <p className="text-xs font-medium text-zinc-400">
+          {stat.label}
+        </p>
+
+        <p className="mt-4 break-words text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          {stat.value}
+        </p>
+
+        <p className="mt-3 text-xs text-zinc-500">
+          {stat.detail}
+        </p>
+      </div>
+    ))}
+  </div>
+
+  {startedGames.length > gamesWithTotals.length && (
+    <p className="mt-3 text-xs text-amber-400">
+      {startedGames.length - gamesWithTotals.length} started
+      games have unknown achievement totals and are excluded
+      from completion calculations.
+    </p>
+  )}
+</section>
 
       {/* MEDAL COLLECTION */}
       <section aria-labelledby="medals-heading" className="mb-14">
