@@ -5,6 +5,7 @@ import { eq, desc } from 'drizzle-orm';
 import Link from 'next/link';
 import { SyncLoader } from '@/components/SyncLoader';
 import { GlobalSyncButton } from '@/components/GlobalSyncButton';
+import { GameCard } from '@/components/GameCard';
 
 export const dynamic = 'force-dynamic';
 
@@ -460,75 +461,14 @@ function profileUrl(
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {visibleGames.map((game) => {
-              const tier = getMedalTier(game);
-              const percentage = game.totalAchievements > 0
-                ? Math.min(100, Math.round(
-                    (game.earnedAchievements / game.totalAchievements) * 100
-                  ))
-                : 0;
-
-              return (
-                <Link
-                  key={`${game.userXuid}-${game.id}`}
-                  href={`/profile/${xuid}/game/${game.id}`}
-                  prefetch={false}
-                  className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#111318] transition-all duration-200 hover:-translate-y-1 hover:border-rose-500/40 hover:shadow-xl hover:shadow-black/30"
-                >
-                  <div className="relative aspect-video w-full overflow-hidden bg-zinc-950">
-                    {game.displayImage ? (
-                      <img
-                        src={game.displayImage}
-                        alt={`${game.name} cover`}
-                        className="h-full w-full object-cover opacity-85 transition duration-300 group-hover:scale-105 group-hover:opacity-100"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-zinc-600">
-                        No artwork
-                      </div>
-                    )}
-
-                    {tier === 'onyx' && (
-                      <span className="absolute right-3 top-3 rounded-full border border-rose-500/30 bg-black/90 px-3 py-1 text-[10px] font-bold tracking-wider text-rose-400">
-                        ◆ ONYX
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-1 flex-col p-4">
-                    <h3 className="mb-auto line-clamp-2 font-semibold text-zinc-200">
-                      {game.name}
-                    </h3>
-
-                    <div className="mt-5">
-                      <div className="mb-2 flex justify-between text-xs text-zinc-400">
-                        <span>Achievements</span>
-                        <span className="font-medium tabular-nums text-zinc-200">
-                          {percentage}%
-                        </span>
-                      </div>
-
-                      <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
-                        <div
-                          className={`h-full rounded-full ${
-                            tier === 'onyx' ? 'bg-rose-400' : 'bg-rose-700'
-                          }`}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-
-                      <p className="mt-3 text-xs text-zinc-500">
-                        {game.earnedAchievements} / {game.totalAchievements} achievements
-                      </p>
-                      <p className="mt-1 text-xs text-zinc-400">
-                        {(game.currentGamerscore ?? 0).toLocaleString()} /{' '}
-                        {(game.totalGamerscore ?? 0).toLocaleString()} G
-                      </p>
-                    </div>
-                  </div>
-                </Link>
-              );
-            })}
+            {visibleGames.map((game) => (
+  <GameCard
+    key={`${game.userXuid}-${game.id}`}
+    game={game}
+    xuid={xuid}
+    tier={getMedalTier(game)}
+  />
+))}
           </div>
         )}
       </section>
