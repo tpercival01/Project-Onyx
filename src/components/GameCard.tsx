@@ -14,20 +14,20 @@ type GameCardData = {
 
 const tierStyles = {
   bronze: {
-    label: 'Bronze',
-    pill: 'border-amber-700/40 bg-amber-950/80 text-amber-300',
-    bar: 'bg-amber-500',
-  },
+  label: 'Bronze',
+  pill: 'border-[#a65d43]/70 bg-[#321b17]/95 text-[#e4a184]',
+  bar: 'bg-[#b66b4d]',
+},
   silver: {
     label: 'Silver',
     pill: 'border-slate-400/40 bg-slate-800/90 text-slate-200',
     bar: 'bg-slate-300',
   },
   gold: {
-    label: 'Gold',
-    pill: 'border-yellow-500/40 bg-yellow-950/80 text-yellow-300',
-    bar: 'bg-yellow-400',
-  },
+  label: 'Gold',
+  pill: 'border-yellow-300/70 bg-[#443405]/95 text-yellow-200',
+  bar: 'bg-yellow-300',
+},
   onyx: {
     label: 'Onyx',
     pill: 'border-rose-400/50 bg-zinc-950/90 text-rose-200',
