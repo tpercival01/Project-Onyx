@@ -1,29 +1,85 @@
+
 import { db } from '@/lib/db';
-import { achievements, games, users } from '@/lib/schema';
-import { eq, desc, and} from 'drizzle-orm';
+import { games, users } from '@/lib/schema';
+import { eq, desc } from 'drizzle-orm';
 import Link from 'next/link';
 import { SyncLoader } from '@/components/SyncLoader';
 import { GlobalSyncButton } from '@/components/GlobalSyncButton';
 
 export const dynamic = 'force-dynamic';
 
+type MedalTier = 'bronze' | 'silver' | 'gold' | 'onyx';
+
+const medals = [
+  {
+    id: 'bronze',
+    name: 'Bronze',
+    requirement: 'Below 50%',
+    colour: 'text-amber-600',
+    gradient: 'from-amber-700 via-orange-400 to-amber-900',
+  },
+  {
+    id: 'silver',
+    name: 'Silver',
+    requirement: '50–79%',
+    colour: 'text-slate-300',
+    gradient: 'from-slate-600 via-slate-200 to-slate-500',
+  },
+  {
+    id: 'gold',
+    name: 'Gold',
+    requirement: '80–99%',
+    colour: 'text-yellow-400',
+    gradient: 'from-yellow-700 via-yellow-300 to-amber-600',
+  },
+  {
+    id: 'onyx',
+    name: 'Onyx',
+    requirement: '100%',
+    colour: 'text-rose-400',
+    gradient: 'from-zinc-950 via-rose-700 to-zinc-900',
+  },
+] as const;
+
+function getMedalTier(game: {
+  earnedAchievements: number;
+  totalAchievements: number;
+}): MedalTier | null {
+  if (game.totalAchievements <= 0 || game.earnedAchievements <= 0) {
+    return null;
+  }
+
+  const percentage =
+    (game.earnedAchievements / game.totalAchievements) * 100;
+
+  if (percentage >= 100) return 'onyx';
+  if (percentage >= 80) return 'gold';
+  if (percentage >= 50) return 'silver';
+  return 'bronze';
+}
+
 export default async function ProfilePage({
   params,
   searchParams,
 }: {
   params: Promise<{ xuid: string }>;
-  searchParams: Promise<{ showAll?: string }>;
+  searchParams: Promise<{ showAll?: string; medal?: string }>;
 }) {
-  const xuid = (await params).xuid;
-  const showAll = (await searchParams).showAll === '1';
+  const { xuid } = await params;
+  const query = await searchParams;
+
+  const showAll = query.showAll === '1';
+  const selectedMedal =
+    medals.find((medal) => medal.id === query.medal)?.id ?? null;
+
   const [profile] = await db
-  .select({
-    gamertag: users.gamertag,
-    avatarUrl: users.avatarUrl,
-  })
-  .from(users)
-  .where(eq(users.xuid, xuid))
-  .limit(1);
+    .select({
+      gamertag: users.gamertag,
+      avatarUrl: users.avatarUrl,
+    })
+    .from(users)
+    .where(eq(users.xuid, xuid))
+    .limit(1);
 
   const userGames = await db
     .select()
@@ -33,174 +89,273 @@ export default async function ProfilePage({
 
   if (userGames.length === 0) {
     return (
-      <main className="p-8 flex min-h-screen items-center justify-center">
-        <SyncLoader xuid={xuid} message="Extracting Game Library..." />
+      <main className="flex min-h-screen items-center justify-center p-8">
+        <SyncLoader xuid={xuid} message="Loading Game Library..." />
       </main>
     );
   }
-  const visibleGames = showAll
-  ? userGames
-  : userGames.filter(game => game.earnedAchievements > 0);
-  const unlockedAch = await db
-  .select({gamerscore: achievements.gamerscore})
-  .from(achievements)
-  .where(and(eq(achievements.userXuid, xuid), eq(achievements.isUnlocked, true)));
 
-  let bronze = 0; let silver = 0; let gold = 0;
-  unlockedAch.forEach(a => {
-    if (a.gamerscore >= 80) gold++;
-    else if (a.gamerscore >= 40) silver++;
-    else bronze++;
+  const medalCounts: Record<MedalTier, number> = {
+    bronze: 0,
+    silver: 0,
+    gold: 0,
+    onyx: 0,
+  };
+
+  for (const game of userGames) {
+    const tier = getMedalTier(game);
+    if (tier) medalCounts[tier]++;
+  }
+
+  const visibleGames = userGames.filter((game) => {
+    if (selectedMedal) {
+      return getMedalTier(game) === selectedMedal;
+    }
+
+    return showAll || game.earnedAchievements > 0;
   });
 
-  const onyxCoins = userGames.filter(g => (g.currentGamerscore ?? 0) === (g.totalGamerscore ?? 0) && (g.totalGamerscore ?? 0) > 0).length;
+  function profileUrl(medal: MedalTier | null = null) {
+    const params = new URLSearchParams();
+    if (showAll) params.set('showAll', '1');
+    if (medal) params.set('medal', medal);
 
-return (
-    <main className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8">
-      
-      {/* HEADER & SYNC BUTTON */}
-      
-{/* PROFILE HEADER */}
-<div className="mb-10 flex flex-col gap-6 border-b border-white/10 pb-8 sm:flex-row sm:items-center sm:justify-between">
-  <div className="flex items-center gap-5">
+    const suffix = params.toString();
+    return `/profile/${xuid}${suffix ? `?${suffix}` : ''}`;
+  }
 
-    {profile?.avatarUrl ? (
-      <img
-        src={profile.avatarUrl}
-        alt={`${profile.gamertag}'s Xbox avatar`}
-        className="h-20 w-20 shrink-0 rounded-2xl border border-white/10 bg-zinc-900 object-cover sm:h-24 sm:w-24"
-      />
-    ) : (
-      <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-zinc-900 text-3xl font-bold text-rose-400">
-        {profile?.gamertag?.charAt(0).toUpperCase() || '?'}
-      </div>
-    )}
+  return (
+    <main className="mx-auto min-h-screen w-full max-w-7xl px-6 py-10 text-zinc-100 lg:px-8">
 
-    <div className="min-w-0">
-      <Link
-        href="/"
-        className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-400 transition hover:text-rose-300"
-      >
-        ONYX / PLAYER PROFILE
-      </Link>
+      {/* PROFILE HEADER */}
+      <header className="mb-12 flex flex-col gap-6 border-b border-white/10 pb-8 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-5">
+          {profile?.avatarUrl ? (
+            <img
+              src={profile.avatarUrl}
+              alt={`${profile.gamertag}'s Xbox avatar`}
+              className="h-20 w-20 shrink-0 rounded-2xl border border-white/10 bg-zinc-900 object-cover sm:h-24 sm:w-24"
+            />
+          ) : (
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-zinc-900 text-3xl font-bold text-rose-400">
+              {profile?.gamertag?.charAt(0).toUpperCase() || '?'}
+            </div>
+          )}
 
-      <h1 className="mt-2 break-words text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-        {profile?.gamertag || 'Xbox Player'}
-      </h1>
+          <div className="min-w-0">
+            <Link
+              href="/"
+              className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-400 hover:text-rose-300"
+            >
+              ONYX / PLAYER PROFILE
+            </Link>
 
-      <p className="mt-2 text-sm text-zinc-400">
-        {userGames.length.toLocaleString()} games in library
-      </p>
-    </div>
-  </div>
+            <h1 className="mt-2 break-words text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              {profile?.gamertag || 'Xbox Player'}
+            </h1>
 
-  <GlobalSyncButton xuid={xuid} />
-</div>
-
-
-      {/* THE ONYX SHOWCASE */}
-      <div className="mb-16 grid grid-cols-2 md:grid-cols-4 gap-4 rounded-2xl border border-neutral-900 bg-[#050505] p-6 shadow-2xl shadow-red-900/5">
-        
-        {/* Onyx Coin (The Platinum) */}
-        <div className="flex flex-col items-center justify-center rounded-xl border border-red-900/50 bg-black p-6 shadow-[0_0_20px_rgba(139,0,0,0.2)]">
-          <div className="mb-2 h-12 w-12 rounded-full bg-gradient-to-br from-red-600 to-black border-2 border-red-500 shadow-[0_0_15px_#ff0000] animate-sith-pulse"></div>
-          <span className="text-3xl font-bold text-neutral-200 font-mono">{onyxCoins}</span>
-          <span className="text-xs font-bold tracking-widest text-red-500 mt-1">ONYX</span>
+            <p className="mt-2 text-sm text-zinc-400">
+              {userGames.length.toLocaleString()} games in library
+            </p>
+          </div>
         </div>
 
-        {/* Gold Coin */}
-        <div className="flex flex-col items-center justify-center rounded-xl border border-yellow-900/30 bg-[#0a0a0a] p-4">
-          <div className="mb-2 h-10 w-10 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-800 border-2 border-yellow-500 shadow-[0_0_10px_rgba(234,179,8,0.3)]"></div>
-          <span className="text-2xl font-bold text-neutral-300 font-mono">{gold}</span>
-          <span className="text-xs font-bold tracking-widest text-yellow-600 mt-1">GOLD</span>
+        <GlobalSyncButton xuid={xuid} />
+      </header>
+
+      {/* MEDAL COLLECTION */}
+      <section aria-labelledby="medals-heading" className="mb-14">
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-400">
+            Your collection
+          </p>
+          <h2
+            id="medals-heading"
+            className="mt-2 text-2xl font-semibold tracking-tight"
+          >
+            Completion Medals
+          </h2>
+          <p className="mt-2 text-sm text-zinc-400">
+            Select a medal to explore games at that completion level.
+          </p>
         </div>
 
-        {/* Silver Coin */}
-        <div className="flex flex-col items-center justify-center rounded-xl border border-neutral-800 bg-[#0a0a0a] p-4">
-          <div className="mb-2 h-10 w-10 rounded-full bg-gradient-to-br from-gray-300 to-gray-600 border-2 border-gray-400"></div>
-          <span className="text-2xl font-bold text-neutral-300 font-mono">{silver}</span>
-          <span className="text-xs font-bold tracking-widest text-neutral-400 mt-1">SILVER</span>
-        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {medals.map((medal) => {
+            const active = selectedMedal === medal.id;
 
-        {/* Bronze Coin */}
-        <div className="flex flex-col items-center justify-center rounded-xl border border-amber-900/30 bg-[#0a0a0a] p-4">
-          <div className="mb-2 h-10 w-10 rounded-full bg-gradient-to-br from-amber-600 to-amber-900 border-2 border-amber-700"></div>
-          <span className="text-2xl font-bold text-neutral-300 font-mono">{bronze}</span>
-          <span className="text-xs font-bold tracking-widest text-amber-700 mt-1">BRONZE</span>
+            return (
+              <Link
+                key={medal.id}
+                href={profileUrl(active ? null : medal.id)}
+                scroll={false}
+                aria-current={active ? 'true' : undefined}
+                className={`group relative flex flex-col items-center rounded-2xl border px-4 py-7 text-center transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 ${
+                  active
+                    ? 'border-rose-500/70 bg-rose-500/10 ring-1 ring-rose-500/30'
+                    : 'border-white/10 bg-[#111318] hover:-translate-y-1 hover:border-white/25 hover:bg-[#191c23]'
+                }`}
+              >
+                {active && (
+                  <span className="absolute right-3 top-3 text-[10px] font-medium uppercase tracking-wider text-rose-400">
+                    Selected
+                  </span>
+                )}
+
+                <div
+                  aria-hidden="true"
+                  className={`mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br ${medal.gradient} p-[3px] shadow-lg shadow-black/40 transition-transform duration-300 group-hover:scale-105`}
+                >
+                  <div className="flex h-full w-full items-center justify-center rounded-full border border-white/15 bg-[#12141a]">
+                    <span className={`text-3xl ${medal.colour}`}>
+                      ◆
+                    </span>
+                  </div>
+                </div>
+
+                <span className={`text-xs font-semibold uppercase tracking-[0.2em] ${medal.colour}`}>
+                  {medal.name}
+                </span>
+
+                <span className="mt-2 text-3xl font-semibold tabular-nums text-white">
+                  {medalCounts[medal.id].toLocaleString()}
+                </span>
+
+                <span className="mt-2 text-xs text-zinc-500">
+                  {medal.requirement} complete
+                </span>
+              </Link>
+            );
+          })}
         </div>
-      </div>
+      </section>
 
       {/* GAME LIBRARY */}
-<div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-  <div>
-    <h2 className="text-2xl font-semibold text-white">
-      Game Library
-    </h2>
-    <p className="mt-1 text-sm text-zinc-500">
-      Showing {visibleGames.length.toLocaleString()} of{' '}
-      {userGames.length.toLocaleString()} games
-    </p>
-  </div>
+      <section aria-labelledby="library-heading">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2
+              id="library-heading"
+              className="text-2xl font-semibold text-white"
+            >
+              {selectedMedal
+                ? `${selectedMedal.charAt(0).toUpperCase()}${selectedMedal.slice(1)} Games`
+                : 'Game Library'}
+            </h2>
 
-  <Link
-    href={
-      showAll
-        ? `/profile/${xuid}`
-        : `/profile/${xuid}?showAll=1`
-    }
-    scroll={false}
-    className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-zinc-300 transition-colors hover:border-rose-500/40 hover:text-white"
-  >
-    {showAll ? 'Hide unstarted games' : 'Show all games'}
-  </Link>
-</div>
+            <p className="mt-1 text-sm text-zinc-500">
+              Showing {visibleGames.length.toLocaleString()} of{' '}
+              {userGames.length.toLocaleString()} games
+            </p>
+          </div>
 
-{visibleGames.length === 0 && (
-  <p className="mb-8 rounded-xl border border-white/10 p-6 text-zinc-400">
-    No games with unlocked achievements found.
-  </p>
-)}
+          {selectedMedal ? (
+            <Link
+              href={profileUrl()}
+              scroll={false}
+              className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-5 py-3 text-sm font-medium text-rose-300 hover:bg-rose-500/20"
+            >
+              Clear medal filter
+            </Link>
+          ) : (
+            <Link
+              href={showAll ? `/profile/${xuid}` : `/profile/${xuid}?showAll=1`}
+              scroll={false}
+              className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-medium text-zinc-300 hover:border-white/25 hover:text-white"
+            >
+              {showAll ? 'Hide unstarted games' : 'Show all games'}
+            </Link>
+          )}
+        </div>
 
-<div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
-  {visibleGames.map((game) => (
-          <Link 
-            href={`/profile/${xuid}/game/${game.id}`} 
-            key={game.id} 
-            prefetch={false}
-            className="block h-full"
-          >
-            <div className="group relative flex h-full flex-col overflow-hidden rounded-xl bg-[#0a0a0a] border border-neutral-800 p-4 transition-all duration-300 hover:border-red-700 hover:shadow-[0_0_20px_rgba(139,0,0,0.3)] cursor-pointer">
-              
-              {/* Platinum check based on Gamerscore! */}
-              {(game.currentGamerscore ?? 0) === (game.totalGamerscore ?? 0) && (game.totalGamerscore ?? 0) > 0 && (
-                <div className="absolute top-6 right-6 z-10 rounded-full bg-black/90 p-2 border border-red-900 shadow-[0_0_15px_#8b0000]">
-                  <div className="h-4 w-4 rounded-full bg-gradient-to-br from-red-500 to-black"></div>
-                </div>
-              )}
-              
-              <div className="relative mb-4 aspect-video w-full overflow-hidden rounded-md border border-neutral-900 bg-neutral-950 pointer-events-none">
-                {game.displayImage ? (
-                  <img 
-                    src={game.displayImage} 
-                    alt={game.name} 
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 opacity-80 group-hover:opacity-100" 
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-xs font-mono text-neutral-600">No Image</div>
-                )}
-              </div>
-              <h2 className="font-bold text-neutral-300 line-clamp-2 mb-auto pointer-events-none">{game.name}</h2>
-              
-              <p className="text-sm text-neutral-500 mt-4 border-t border-neutral-900 pt-2 flex items-center justify-between pointer-events-none">
-                <span>PROGRESS</span>
-                <span className="font-mono">
-                  <span className="text-red-700">{game.currentGamerscore ?? 0}</span> / {game.totalGamerscore ?? 0} G
-                </span>
-              </p>
-            </div>
-          </Link>
-        ))}
-      </div>
+        {visibleGames.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-10 text-center">
+            <p className="text-zinc-300">
+              {selectedMedal
+                ? 'No games in this medal tier yet.'
+                : 'No games with unlocked achievements found.'}
+            </p>
+            <Link
+              href={profileUrl()}
+              className="mt-4 inline-block text-sm text-rose-400 hover:text-rose-300"
+            >
+              View your library
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {visibleGames.map((game) => {
+              const tier = getMedalTier(game);
+              const percentage = game.totalAchievements > 0
+                ? Math.min(100, Math.round(
+                    (game.earnedAchievements / game.totalAchievements) * 100
+                  ))
+                : 0;
+
+              return (
+                <Link
+                  key={`${game.userXuid}-${game.id}`}
+                  href={`/profile/${xuid}/game/${game.id}`}
+                  prefetch={false}
+                  className="group flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#111318] transition-all duration-200 hover:-translate-y-1 hover:border-rose-500/40 hover:shadow-xl hover:shadow-black/30"
+                >
+                  <div className="relative aspect-video w-full overflow-hidden bg-zinc-950">
+                    {game.displayImage ? (
+                      <img
+                        src={game.displayImage}
+                        alt={`${game.name} cover`}
+                        className="h-full w-full object-cover opacity-85 transition duration-300 group-hover:scale-105 group-hover:opacity-100"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs text-zinc-600">
+                        No artwork
+                      </div>
+                    )}
+
+                    {tier === 'onyx' && (
+                      <span className="absolute right-3 top-3 rounded-full border border-rose-500/30 bg-black/90 px-3 py-1 text-[10px] font-bold tracking-wider text-rose-400">
+                        ◆ ONYX
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-1 flex-col p-4">
+                    <h3 className="mb-auto line-clamp-2 font-semibold text-zinc-200">
+                      {game.name}
+                    </h3>
+
+                    <div className="mt-5">
+                      <div className="mb-2 flex justify-between text-xs text-zinc-400">
+                        <span>Achievements</span>
+                        <span className="font-medium tabular-nums text-zinc-200">
+                          {percentage}%
+                        </span>
+                      </div>
+
+                      <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                        <div
+                          className={`h-full rounded-full ${
+                            tier === 'onyx' ? 'bg-rose-400' : 'bg-rose-700'
+                          }`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+
+                      <p className="mt-3 text-xs text-zinc-500">
+                        {game.earnedAchievements} / {game.totalAchievements} achievements
+                      </p>
+                      <p className="mt-1 text-xs text-zinc-400">
+                        {(game.currentGamerscore ?? 0).toLocaleString()} /{' '}
+                        {(game.totalGamerscore ?? 0).toLocaleString()} G
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </main>
   );
 }
