@@ -4,47 +4,93 @@
 import { useState } from 'react';
 import { requestLibraryRefresh } from '@/app/actions';
 
-export function GlobalSyncButton({ xuid }: { xuid: string }) {
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState(false);
+type RefreshState =
+  | 'idle'
+  | 'requesting'
+  | 'queued'
+  | 'already_queued'
+  | 'error';
 
-  const handleSync = async () => {
-    if (isSyncing) return;
+export function GlobalSyncButton({
+  xuid,
+}: {
+  xuid: string;
+}) {
+  const [status, setStatus] = useState<RefreshState>('idle');
 
-    setIsSyncing(true);
-    setMessage(null);
-    setError(false);
+  const disabled =
+    status === 'requesting' ||
+    status === 'queued' ||
+    status === 'already_queued';
+
+  async function handleRefresh() {
+    if (disabled) return;
+
+    setStatus('requesting');
 
     try {
-      await requestLibraryRefresh(xuid);
-
-      setMessage(
-        'Refresh queued. Updated games will appear as synchronization completes.'
-      );
+      const result = await requestLibraryRefresh(xuid);
+      setStatus(result);
     } catch {
-      setError(true);
-      setMessage('Unable to start refresh. Please try again later.');
-    } finally {
-      setIsSyncing(false);
+      setStatus('error');
     }
-  };
+  }
+
+  const buttonLabel = {
+    idle: 'Refresh Library',
+    requesting: 'Requesting refresh...',
+    queued: 'Refresh queued',
+    already_queued: 'Already refreshing',
+    error: 'Retry refresh',
+  }[status];
+
+  const message = {
+    idle: null,
+    requesting: null,
+    queued:
+      'Your library refresh has been queued. Updated data will appear as synchronization completes.',
+    already_queued:
+      'A library refresh is already queued or running. No duplicate job was created.',
+    error:
+      'Unable to request a refresh. Please try again later.',
+  }[status];
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex w-full flex-col gap-3 sm:w-auto">
       <button
-        onClick={handleSync}
-        disabled={isSyncing}
-        className="rounded-lg border border-red-900/50 bg-neutral-900 px-6 py-3 font-medium text-red-400 transition-colors hover:bg-red-950 disabled:cursor-wait disabled:opacity-50"
+        type="button"
+        onClick={handleRefresh}
+        disabled={disabled}
+        aria-busy={status === 'requesting'}
+        className={`inline-flex min-h-12 items-center justify-center gap-3 rounded-xl border px-6 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400 disabled:cursor-not-allowed ${
+          status === 'queued' ||
+          status === 'already_queued'
+            ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300'
+            : 'border-rose-500/30 bg-rose-500/10 text-rose-300 hover:border-rose-400/50 hover:bg-rose-500/20'
+        }`}
       >
-        {isSyncing ? 'Requesting refresh...' : 'Refresh Library'}
+        {status === 'requesting' ? (
+          <span
+            aria-hidden="true"
+            className="h-4 w-4 animate-spin rounded-full border-2 border-rose-400/30 border-t-rose-300"
+          />
+        ) : status === 'queued' ||
+          status === 'already_queued' ? (
+          <span aria-hidden="true">✓</span>
+        ) : (
+          <span aria-hidden="true">↻</span>
+        )}
+
+        {buttonLabel}
       </button>
 
       {message && (
         <p
-          role={error ? 'alert' : 'status'}
-          className={`text-sm ${
-            error ? 'text-red-400' : 'text-neutral-400'
+          role={status === 'error' ? 'alert' : 'status'}
+          className={`max-w-xs text-xs leading-relaxed ${
+            status === 'error'
+              ? 'text-red-300'
+              : 'text-zinc-400'
           }`}
         >
           {message}
