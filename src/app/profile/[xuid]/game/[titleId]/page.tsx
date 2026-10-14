@@ -105,11 +105,34 @@ export default async function GamePage({
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-rose-400">
                 Game overview
               </span>
-              {isOnyx && (
-                <span className="rounded-full border border-rose-400/40 bg-zinc-950/80 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-rose-200 shadow-[0_0_24px_rgba(244,63,94,0.14)]">
-                  ◆ Onyx complete
-                </span>
-              )}
+              
+{isOnyx && (
+  <div className="flex w-full items-center gap-4 rounded-2xl border border-rose-400/25 bg-zinc-950/80 px-4 py-3 shadow-[0_0_35px_rgba(244,63,94,0.08)] sm:w-auto">
+    <div className="relative shrink-0">
+      <div className="absolute inset-3 rounded-full bg-rose-500/25 blur-2xl" />
+      <img
+        src="/medals/onyx.svg"
+        alt="Onyx completion medal"
+        width={112}
+        height={112}
+        className="relative h-24 w-24 object-contain drop-shadow-[0_0_12px_rgba(244,63,94,0.3)] sm:h-28 sm:w-28"
+      />
+    </div>
+
+    <div className="min-w-0">
+      <p className="text-xs font-bold uppercase tracking-[0.2em] text-rose-400">
+        Onyx Medal Earned
+      </p>
+      <p className="mt-2 text-lg font-semibold text-white">
+        100% Complete
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+        All {total.toLocaleString()} achievements unlocked.
+      </p>
+    </div>
+  </div>
+)}
+
             </div>
 
             <h1 className="max-w-3xl break-words text-3xl font-bold tracking-tight text-white sm:text-4xl lg:text-5xl">
