@@ -1,57 +1,98 @@
+
 'use client';
 
-import { getAchievementCoin } from '@/lib/coin';
+type Achievement = {
+  id: string;
+  name: string;
+  description: string;
+  gamerscore: number;
+  isUnlocked: boolean;
+  iconUrl: string | null;
+};
 
-export function AchievementCard({ achievement }: { achievement: any }) {
-  const coin = getAchievementCoin(achievement.gamerscore);
-  
-  const isUnlocked = achievement.isUnlocked;
+export function AchievementCard({
+  achievement,
+}: {
+  achievement: Achievement;
+}) {
+  const unlocked = achievement.isUnlocked;
 
   return (
-    <div className={`flex items-start gap-4 rounded-xl border p-4 transition-all h-full ${
-      isUnlocked 
-        ? 'bg-[#0a0a0a] border-red-900/40 hover:border-red-700 shadow-[0_0_10px_rgba(139,0,0,0.1)]' 
-        : 'bg-black border-neutral-900 opacity-60'
-    }`}>
-      
-      <div className="shrink-0 h-16 w-16 overflow-hidden rounded-md bg-neutral-950 border border-neutral-800 flex items-center justify-center">
-        {achievement.iconUrl ? (
-          <img 
-            src={achievement.iconUrl} 
-            alt={achievement.name} 
-            className={`h-full w-full object-cover ${!isUnlocked && 'grayscale opacity-50'}`} 
-            onError={(e) => {
-              // Hide the broken image icon safely in the browser!
-              e.currentTarget.style.display = 'none';
-            }}
+    <article
+      className={`group flex h-full flex-col overflow-hidden rounded-2xl border transition-all duration-200 ${
+        unlocked
+          ? 'border-white/10 bg-[#111318] hover:border-rose-500/30 hover:bg-[#171a20]'
+          : 'border-white/5 bg-[#0e1014] hover:border-white/15'
+      }`}
+    >
+      <div className="flex items-start gap-4 p-4">
+        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-white/10 bg-zinc-900">
+          {achievement.iconUrl ? (
+            <img
+              src={achievement.iconUrl}
+              alt=""
+              loading="lazy"
+              className={`h-full w-full object-cover ${
+                unlocked ? '' : 'grayscale opacity-50'
+              }`}
+              onError={(event) => {
+                event.currentTarget.style.display = 'none';
+              }}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs text-zinc-600">
+              No image
+            </div>
+          )}
+
+          {!unlocked && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+              <span className="rounded-full bg-black/70 px-2 py-1 text-xs text-zinc-300">
+                Locked
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3
+            className={`line-clamp-2 text-sm font-semibold leading-snug ${
+              unlocked ? 'text-zinc-100' : 'text-zinc-400'
+            }`}
+          >
+            {achievement.name}
+          </h3>
+
+          <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-zinc-500">
+            {achievement.description}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-auto flex items-center justify-between border-t border-white/5 px-4 py-3">
+        <span
+          className={`inline-flex items-center gap-2 text-xs font-medium ${
+            unlocked ? 'text-emerald-400' : 'text-zinc-500'
+          }`}
+        >
+          <span
+            className={`h-2 w-2 rounded-full ${
+              unlocked ? 'bg-emerald-400' : 'bg-zinc-600'
+            }`}
           />
-        ) : (
-          <span className="text-xs font-mono text-neutral-700">N/A</span>
-        )}
-      </div>
-      
-      <div className="flex-1 min-w-0">
-        <h3 className={`font-bold tracking-wide truncate ${isUnlocked ? 'text-neutral-200' : 'text-neutral-500'}`}>
-          {achievement.name}
-        </h3>
-        <p className={`text-sm mt-1 line-clamp-2 ${isUnlocked ? 'text-neutral-400' : 'text-neutral-600'}`}>
-          {achievement.description}
-        </p>
-      </div>
-      
-      <div className="shrink-0 text-right font-mono tracking-widest pl-2">
-        <span className={`block text-xl font-bold ${isUnlocked ? 'text-neutral-300' : 'text-neutral-600'}`}>
-          {achievement.gamerscore}G
+          {unlocked ? 'Unlocked' : 'Locked'}
         </span>
-        <span className={`text-[10px] font-bold block mt-1 ${
-          !isUnlocked ? 'text-neutral-700' :
-          coin === 'Gold' ? 'text-yellow-600' : 
-          coin === 'Silver' ? 'text-neutral-400' : 
-          'text-amber-700'
-        }`}>
-          {coin.toUpperCase()}
+
+        <span
+          className={`rounded-lg border px-3 py-1 text-sm font-semibold tabular-nums ${
+            unlocked
+              ? 'border-white/10 bg-white/5 text-zinc-100'
+              : 'border-white/5 bg-black/20 text-zinc-500'
+          }`}
+        >
+          {achievement.gamerscore.toLocaleString()} G
         </span>
       </div>
-    </div>
+    </article>
   );
 }
