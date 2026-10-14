@@ -338,16 +338,28 @@ function profileUrl(
                   </span>
                 )}
 
-                <div
-                  aria-hidden="true"
-                  className={`mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br ${medal.gradient} p-[3px] shadow-lg shadow-black/40 transition-transform duration-300 group-hover:scale-105`}
-                >
-                  <div className="flex h-full w-full items-center justify-center rounded-full border border-white/15 bg-[#12141a]">
-                    <span className={`text-3xl ${medal.colour}`}>
-                      ◆
-                    </span>
-                  </div>
-                </div>
+                
+<div
+  aria-hidden="true"
+  className="relative mb-5 h-28 w-28"
+>
+  {medal.id === 'onyx' && (
+    <span className="pointer-events-none absolute inset-2 rounded-full bg-rose-500/20 opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-100" />
+  )}
+
+  <img
+    src={`/medals/${medal.id}.svg`}
+    alt=""
+    width={112}
+    height={112}
+    className={`relative h-full w-full object-contain transition-transform duration-300 group-hover:scale-110 motion-reduce:transform-none ${
+      medal.id === 'onyx'
+        ? 'drop-shadow-[0_0_14px_rgba(244,63,94,0.3)]'
+        : 'drop-shadow-[0_8px_10px_rgba(0,0,0,0.35)]'
+    }`}
+  />
+</div>
+
 
                 <span className={`text-xs font-semibold uppercase tracking-[0.2em] ${medal.colour}`}>
                   {medal.name}
