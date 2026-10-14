@@ -125,6 +125,7 @@ async function queueOnyxSync(path: string) {
   if (!response.ok) {
     throw new Error(`Sync request failed (${response.status})`);
   }
+  return response;
 }
 
 export async function requestAchievementSync(
@@ -141,10 +142,34 @@ export async function requestAchievementSync(
   );
 }
 
-export async function requestLibraryRefresh(xuid: string) {
+
+export async function requestLibraryRefresh(
+  xuid: string
+): Promise<'queued' | 'already_queued'> {
   if (!/^\d{1,20}$/.test(xuid)) {
     throw new Error('Invalid Xbox identifier');
   }
 
-  await queueOnyxSync(`/sync/refresh/${xuid}`);
+  const response = await queueOnyxSync(
+    `/sync/refresh/${xuid}`
+  );
+
+  const data: unknown = await response.json();
+
+  if (
+    typeof data !== 'object' ||
+    data === null ||
+    !('status' in data)
+  ) {
+    throw new Error('Invalid refresh response');
+  }
+
+  if (
+    data.status !== 'queued' &&
+    data.status !== 'already_queued'
+  ) {
+    throw new Error('Unexpected refresh status');
+  }
+
+  return data.status;
 }
