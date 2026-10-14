@@ -1,5 +1,5 @@
 
-import { submitGamertag } from './actions';
+import { GamertagSearch } from '@/components/GamertagSearch';
 
 export default function HomePage() {
   return (
@@ -51,42 +51,7 @@ export default function HomePage() {
               how close you are to completing every game.
             </p>
 
-            <form
-              action={submitGamertag}
-              className="mt-10 max-w-xl"
-            >
-              <label
-                htmlFor="gamertag"
-                className="mb-3 block text-sm font-medium text-zinc-300"
-              >
-                Find your Xbox profile
-              </label>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <input
-                  id="gamertag"
-                  name="gamertag"
-                  type="text"
-                  placeholder="Enter your Gamertag"
-                  autoComplete="off"
-                  maxLength={32}
-                  required
-                  className="min-w-0 flex-1 rounded-xl border border-white/15 bg-white/[0.05] px-5 py-4 text-base text-white outline-none transition placeholder:text-zinc-600 focus:border-rose-400 focus:ring-2 focus:ring-rose-400/20"
-                />
-
-                <button
-                  type="submit"
-                  className="rounded-xl bg-rose-600 px-7 py-4 text-sm font-bold text-white transition hover:bg-rose-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-400"
-                >
-                  View profile →
-                </button>
-              </div>
-
-              <p className="mt-3 text-xs text-zinc-500">
-                Public Xbox profiles only. Initial synchronization
-                may take a few moments.
-              </p>
-            </form>
+            <GamertagSearch />
           </div>
 
           <div className="relative mx-auto w-full max-w-[510px]">

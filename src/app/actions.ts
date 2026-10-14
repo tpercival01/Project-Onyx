@@ -5,45 +5,79 @@ import { db } from '../lib/db';
 import { games, achievements } from '../lib/schema';
 import { eq, and, sql } from 'drizzle-orm';
 
-export async function submitGamertag(formData: FormData) {
-  const gamertag = formData.get('gamertag');
 
-  if (!gamertag || typeof gamertag !== 'string') {
-    throw new Error('Invalid gamertag');
+export type GamertagSearchState = {
+  error: string | null;
+};
+
+export async function submitGamertag(
+  _previousState: GamertagSearchState,
+  formData: FormData
+): Promise<GamertagSearchState> {
+  const raw = formData.get('gamertag');
+  const gamertag = typeof raw === 'string' ? raw.trim() : '';
+
+  if (!gamertag || gamertag.length > 32) {
+    return { error: 'Enter a valid Xbox Gamertag.' };
   }
-
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.onyx.thomaspercival.dev';
 
   const token = process.env.ONYX_SYNC_TOKEN;
 
   if (!token) {
-    throw new Error('Backend authentication is not configured');
+    return {
+      error: 'Profile search is temporarily unavailable.',
+    };
   }
 
-  const res = await fetch(
-    `${API_URL}/sync/profile/${encodeURIComponent(gamertag.trim())}`,
-    {
-      method: 'POST',
-      headers: {
-        'X-Onyx-Sync-Token': token,
-      },
-      cache: 'no-store',
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL ||
+    'https://api.onyx.thomaspercival.dev';
+
+  let xuid: string | undefined;
+
+  try {
+    const response = await fetch(
+      `${API_URL}/sync/profile/${encodeURIComponent(gamertag)}`,
+      {
+        method: 'POST',
+        headers: { 'X-Onyx-Sync-Token': token },
+        cache: 'no-store',
+      }
+    );
+
+    if (!response.ok) {
+      return {
+        error:
+          response.status === 429
+            ? 'Too many requests. Please try again later.'
+            : 'Unable to contact Xbox services. Please try again.',
+      };
     }
-  );
 
-  if (!res.ok) {
-    throw new Error('Failed to reach sync engine');
+    const data = await response.json();
+
+    if (data.error || !data.xuid) {
+      return {
+        error: 'Gamertag not found. Check the spelling and try again.',
+      };
+    }
+
+    xuid = data.xuid;
+  } catch {
+    return {
+      error: 'Connection failed. Please try again in a moment.',
+    };
   }
 
-  const data = await res.json();
-
-  if (data.error || !data.xuid) {
-    throw new Error(data.error || 'User not found on Xbox Live');
+  if (!xuid || !/^\d{1,20}$/.test(xuid)) {
+    return {
+      error: 'Unable to retrieve this Xbox profile.',
+    };
   }
 
-  // 2. Redirect to profile. Python is doing the DB inserts in the background!
-  redirect(`/profile/${data.xuid}`);
+  redirect(`/profile/${xuid}`);
 }
+
 
 // Helper to check if games have landed in the DB yet
 export async function checkGamesExist(xuid: string) {
