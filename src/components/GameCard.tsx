@@ -86,15 +86,25 @@ export function GameCard({
           </span>
         )}
 
-        {isOnyx && (
-          <div className="absolute right-3 top-3" aria-label="Onyx completion medal">
-            <span className="grid h-12 w-12 place-items-center rounded-full border border-rose-300/60 bg-gradient-to-br from-rose-600 via-zinc-950 to-rose-900 p-1 shadow-[0_0_22px_rgba(244,63,94,0.45)]">
-              <span className="grid h-full w-full place-items-center rounded-full border border-rose-400/30 bg-zinc-950 text-xl text-rose-300">
-                ◆
-              </span>
-            </span>
-          </div>
-        )}
+        
+{isOnyx && (
+  <div
+    className="pointer-events-none absolute right-2 top-2 z-10"
+    aria-label="Onyx completion medal"
+    role="img"
+  >
+    <div className="absolute inset-2 rounded-full bg-rose-500/25 blur-xl transition-all duration-500 group-hover:bg-rose-500/45" />
+
+    <img
+      src="/medals/onyx.svg"
+      alt=""
+      width={72}
+      height={72}
+      className="relative h-[72px] w-[72px] object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] transition-transform duration-500 group-hover:scale-110 motion-reduce:transform-none"
+    />
+  </div>
+)}
+
       </div>
 
       <div className="flex flex-1 flex-col px-4 pb-4 pt-4">
